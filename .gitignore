@@ -1,0 +1,13 @@
+# Ignore large data files
+*.csv
+
+# Ignore logs and temp text files
+*.txt
+
+# Python cache and environments
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+env/
+.env

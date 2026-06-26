@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Family Tree Explorer — NID Database | 50 Lakh+ Records</title>
+    <meta name="description"
+        content="Explore family hierarchy and relationships across 50 Lakh+ citizen records using NID-based graph visualization.">
+
+    <!-- D3.js library for graph visualization -->
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+
+    <!-- Google Fonts: Outfit + JetBrains Mono -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap"
+        rel="stylesheet">
+
+    <!-- Our stylesheet -->
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+
+<body>
+
+    <!-- HERO LANDING SECTION (shown initially, hidden after search) -->
+    <section class="hero-section" id="heroSection">
+
+        <!-- Animated background particles -->
+        <div class="hero-particles" id="heroParticles"></div>
+
+        <!-- Floating stats badges -->
+        <div class="hero-float-badges">
+            <div class="float-badge badge-1">
+                <span class="badge-icon">🔗</span>
+                <span class="badge-text">Graph Database</span>
+            </div>
+            <div class="float-badge badge-2">
+                <span class="badge-icon">⚡</span>
+                <span class="badge-text">Real-time Query</span>
+            </div>
+            <div class="float-badge badge-3">
+                <span class="badge-icon">🌐</span>
+                <span class="badge-text">Neo4j Powered</span>
+            </div>
+        </div>
+
+        <div class="hero-content">
+            <!-- Glowing accent line -->
+            <div class="hero-accent-line"></div>
+
+            <div class="hero-badge">
+                <span class="hero-badge-dot"></span>
+                PROTOTYPE v2.0 — LIVE DATABASE
+            </div>
+
+            <h1 class="hero-title">
+                <span class="hero-title-line1">Family Hierarchy</span>
+                <span class="hero-title-line2">Explorer</span>
+            </h1>
+
+            <p class="hero-subtitle">
+                This platform contains <strong class="hero-highlight">50 Lakh+</strong> citizen records.
+                Search any NID to instantly explore the complete family hierarchy — parents, grandparents,
+                siblings, cousins, in-laws and beyond.
+            </p>
+
+            <div class="hero-stats">
+                <div class="hero-stat">
+                    <span class="hero-stat-number" id="statUsers">50,00,000</span>
+                    <span class="hero-stat-label">Total Citizens</span>
+                </div>
+                <div class="hero-stat-divider"></div>
+                <div class="hero-stat">
+                    <span class="hero-stat-number">4</span>
+                    <span class="hero-stat-label">Generation Depth</span>
+                </div>
+                <div class="hero-stat-divider"></div>
+                <div class="hero-stat">
+                    <span class="hero-stat-number">&lt;0.5s</span>
+                    <span class="hero-stat-label">Avg. Query Time</span>
+                </div>
+            </div>
+
+            <!-- Main NID Search Box -->
+            <div class="hero-search-wrapper">
+                <div class="hero-search-box" id="heroSearchBox">
+                    <div class="search-icon-wrapper">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2.5" stroke-linecap="round">
+                            <circle cx="11" cy="11" r="8" />
+                            <path d="m21 21-4.35-4.35" />
+                        </svg>
+                    </div>
+                    <input type="text" id="heroSearchInput" placeholder="Enter NID number to explore family tree..."
+                        autocomplete="off">
+                    <button class="hero-search-btn" id="heroSearchBtn" onclick="handleHeroSearch()">
+                        <span>Search NID</span>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2.5">
+                            <path d="M5 12h14M12 5l7 7-7 7" />
+                        </svg>
+                    </button>
+                </div>
+
+                <!-- Search results dropdown -->
+                <div class="hero-search-results" id="heroSearchResults"></div>
+            </div>
+
+            <!-- Searching state -->
+            <div class="search-progress" id="searchProgress">
+                <div class="search-progress-bar">
+                    <div class="search-progress-fill" id="searchProgressFill"></div>
+                </div>
+                <div class="search-progress-text" id="searchProgressText">Searching across 50,00,000 records...</div>
+            </div>
+
+            <!-- Search completed timing -->
+            <div class="search-timing-result" id="searchTimingResult">
+                <div class="timing-icon">⚡</div>
+                <div class="timing-text" id="timingText"></div>
+            </div>
+
+        </div>
+    </section>
+
+    <!-- RELATIONSHIP FINDER SECTION (separate from hero, reduced gap) -->
+    <section class="rel-finder-section" id="relFinderSection">
+        <div class="rel-finder-container">
+            <div class="rel-finder-header">
+                <span class="rel-finder-icon">🔗</span>
+                <div>
+                    <h2>Find Relationship Between Two Citizens</h2>
+                    <p>Enter two NID numbers to discover how they are related</p>
+                </div>
+            </div>
+            <div class="hero-rel-inputs">
+                <div class="hero-rel-input-wrap">
+                    <label>Person 1</label>
+                    <input type="text" id="heroRelNid1" placeholder="Enter NID 1...">
+                </div>
+                <div class="hero-rel-divider">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M5 12h14M12 5l7 7-7 7" />
+                    </svg>
+                </div>
+                <div class="hero-rel-input-wrap">
+                    <label>Person 2</label>
+                    <input type="text" id="heroRelNid2" placeholder="Enter NID 2...">
+                </div>
+                <button class="hero-rel-btn" onclick="heroFindRelationship()">Find</button>
+            </div>
+            <div class="hero-rel-result" id="heroRelResult">
+                <div class="hero-rel-label" id="heroRelLabel"></div>
+                <div class="hero-rel-path" id="heroRelPath"></div>
+            </div>
+        </div>
+    </section>
+
+
+    <!-- APP SECTION (shown after a citizen is selected) -->
+    <section class="app-section" id="appSection">
+
+        <!-- left sidebar: contains search, profile card, and relationship finder -->
+        <aside class="sidebar">
+
+            <!-- App title -->
+            <div class="sidebar-header">
+                <div class="sidebar-header-top">
+                    <h1>🌳 Family Tree Explorer</h1>
+                    <button class="btn-back-hero" onclick="showHero()" title="Back to Home">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2.5">
+                            <path d="M19 12H5M12 19l-7-7 7-7" />
+                        </svg>
+                    </button>
+                </div>
+                <p>NID Database — 50 Lakh+ Records</p>
+            </div>
+
+            <!-- Search box: type NID or name to find a citizen -->
+            <div class="search-box">
+                <div class="sidebar-search-wrapper">
+                    <svg class="sidebar-search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2.5">
+                        <circle cx="11" cy="11" r="8" />
+                        <path d="m21 21-4.35-4.35" />
+                    </svg>
+                    <input type="text" id="searchInput" placeholder="Search by NID or name..." autocomplete="off">
+                </div>
+            </div>
+
+            <!-- Search results appear here dynamically -->
+            <div class="search-results" id="searchResults"></div>
+
+            <!-- Profile panel: shows the selected citizen's details -->
+            <div class="profile-panel" id="profilePanel">
+                <!-- This is the empty state (before any citizen is selected) -->
+                <div class="profile-empty">
+                    <div class="profile-empty-emoji">👤</div>
+                    <p>Search for a citizen by NID or name to view their profile and family tree</p>
+                </div>
+            </div>
+        </aside>
+
+
+        <!-- main canvas (right side) for rendering the D3.js family tree graph -->
+        <div class="main" id="mainCanvas">
+
+            <!-- Welcome message (shown before any tree is loaded) -->
+            <div class="empty-state" id="emptyState">
+                <h2>Welcome to Family Tree Explorer</h2>
+                <p>Enter an NID number in the search bar above to load a citizen's profile and family tree.</p>
+            </div>
+
+            <!-- Zoom controls (top-right corner) -->
+            <div class="toolbar">
+                <button onclick="zoomIn()" title="Zoom In">+</button>
+                <button onclick="zoomOut()" title="Zoom Out">−</button>
+                <button onclick="resetView()" title="Reset View">⟲</button>
+            </div>
+
+            <!-- Color legend (bottom-right corner, hidden until tree loads) -->
+            <div class="legend" style="display:none" id="legend">
+                <div class="legend-item">
+                    <div class="legend-dot" style="background: var(--accent)"></div>
+                    Selected Person
+                </div>
+                <div class="legend-item">
+                    <div class="legend-dot" style="background: var(--male)"></div>
+                    Male
+                </div>
+                <div class="legend-item">
+                    <div class="legend-dot" style="background: var(--female)"></div>
+                    Female
+                </div>
+                <div class="legend-item">
+                    <div class="legend-dot" style="background: var(--gold)"></div>
+                    Spouse Link
+                </div>
+                <div class="legend-item">
+                    <div class="legend-dot" style="background: var(--green)"></div>
+                    Sibling / Cousin
+                </div>
+            </div>
+
+            <!-- Loading spinner overlay -->
+            <div class="loading-overlay" id="loading">
+                <div class="spinner"></div>
+                <div class="loading-text">Loading family tree...</div>
+            </div>
+
+            <!-- Tooltip (follows the mouse when hovering a node) -->
+            <div class="tooltip" id="tooltip"></div>
+
+        </div>
+
+    </section>
+
+
+    <!-- RELATIONSHIP TABLE MODAL -->
+    <div class="modal-overlay" id="relTableModal">
+        <div class="modal-container">
+            <div class="modal-header">
+                <div class="modal-title-group">
+                    <h2 id="modalTitle">Family Relationship Table</h2>
+                    <p class="modal-subtitle" id="modalSubtitle">Complete family hierarchy breakdown</p>
+                </div>
+                <button class="modal-close" onclick="closeRelTable()">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2.5">
+                        <path d="M18 6 6 18M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+
+            <div class="modal-body" id="modalBody">
+                <!-- Tables get populated dynamically -->
+            </div>
+        </div>
+    </div>
+
+
+    <!-- Our JavaScript (loaded at the end so the DOM is ready) -->
+    <script src="/static/js/app.js"></script>
+
+</body>
+
+</html>

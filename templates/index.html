@@ -158,6 +158,63 @@
         </div>
     </section>
 
+    <!-- FIND INHERITORS SECTION (below relationship finder) -->
+    <section class="inheritors-section" id="inheritorsSection">
+        <div class="inheritors-container">
+            <div class="inheritors-header">
+                <span class="inheritors-icon">👨‍👧‍👦</span>
+                <div>
+                    <h2>Find Inheritors</h2>
+                    <p>Enter an NID number to find all children (inheritors) of that citizen</p>
+                </div>
+            </div>
+            <div class="inheritors-input-row">
+                <div class="inheritors-input-wrap">
+                    <label>Parent NID</label>
+                    <input type="text" id="inheritorsNidInput" placeholder="Enter NID...">
+                </div>
+                <button class="inheritors-btn" onclick="findInheritors()">Find</button>
+            </div>
+            <div class="inheritors-result" id="inheritorsResult">
+                <div class="inheritors-result-header" id="inheritorsResultHeader"></div>
+                <div class="inheritors-list" id="inheritorsList"></div>
+            </div>
+        </div>
+    </section>
+
+    <!-- BIRTH REGISTRATION AUDIT SECTION -->
+    <section class="birth-audit-section" id="birthAuditSection">
+        <div class="birth-audit-container">
+            <div class="birth-audit-header">
+                <span class="birth-audit-icon">🚩</span>
+                <div>
+                    <h2>Birth Registration Audit</h2>
+                    <p>Detect duplicate or suspiciously close birth registrations for a couple</p>
+                </div>
+            </div>
+            <div class="birth-audit-inputs">
+                <div class="birth-audit-input-wrap">
+                    <label>Father NID</label>
+                    <input type="text" id="auditFatherNid" placeholder="Enter Father NID...">
+                </div>
+                <div class="birth-audit-divider">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 5v14M5 12h14" />
+                    </svg>
+                </div>
+                <div class="birth-audit-input-wrap">
+                    <label>Mother NID</label>
+                    <input type="text" id="auditMotherNid" placeholder="Enter Mother NID...">
+                </div>
+                <button class="birth-audit-btn" onclick="runBirthAudit()">Audit</button>
+            </div>
+            <div class="birth-audit-result" id="birthAuditResult">
+                <div class="birth-audit-summary" id="birthAuditSummary"></div>
+                <div class="birth-audit-timeline" id="birthAuditTimeline"></div>
+            </div>
+        </div>
+    </section>
+
 
     <!-- APP SECTION (shown after a citizen is selected) -->
     <section class="app-section" id="appSection">
@@ -223,25 +280,69 @@
 
             <!-- Color legend (bottom-right corner, hidden until tree loads) -->
             <div class="legend" style="display:none" id="legend">
-                <div class="legend-item">
-                    <div class="legend-dot" style="background: var(--accent)"></div>
-                    Selected Person
+                <div class="legend-head" onclick="toggleLegend()">
+                    <span>Legend</span>
+                    <svg class="legend-caret" width="12" height="12" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="3">
+                        <path d="M6 9l6 6 6-6" />
+                    </svg>
                 </div>
-                <div class="legend-item">
-                    <div class="legend-dot" style="background: var(--male)"></div>
-                    Male
-                </div>
-                <div class="legend-item">
-                    <div class="legend-dot" style="background: var(--female)"></div>
-                    Female
-                </div>
-                <div class="legend-item">
-                    <div class="legend-dot" style="background: var(--gold)"></div>
-                    Spouse Link
-                </div>
-                <div class="legend-item">
-                    <div class="legend-dot" style="background: var(--green)"></div>
-                    Sibling / Cousin
+                <div class="legend-body">
+
+                    <div class="legend-group">
+                        <div class="legend-group-label">People</div>
+                        <div class="legend-item"><span class="legend-dot" style="background:#7c6aef"></span>Selected
+                            person</div>
+                        <div class="legend-item"><span class="legend-dot" style="background:#3b82f6"></span>Male</div>
+                        <div class="legend-item"><span class="legend-dot" style="background:#ec4899"></span>Female</div>
+                        <div class="legend-item"><span class="legend-dot" style="background:#f59e0b"></span>Spouse</div>
+                    </div>
+
+                    <div class="legend-group">
+                        <div class="legend-group-label">Ring flags</div>
+                        <div class="legend-item"><span class="legend-ring" style="border-color:#10b981"></span>Full
+                            sibling</div>
+                        <div class="legend-item"><span class="legend-ring dash"
+                                style="border-color:#22d3ee"></span>Half sibling</div>
+                        <div class="legend-item"><span class="legend-ring dash"
+                                style="border-color:#fb923c"></span>Step relation</div>
+                        <div class="legend-item"><span class="legend-ring dash"
+                                style="border-color:#f43f5e"></span>Co-wife / co-husband</div>
+                        <div class="legend-item"><span
+                                style="color:#f59e0b;font-size:13px;line-height:1;width:12px;text-align:center;flex-shrink:0">⚭</span>Multiple
+                            marriages</div>
+                    </div>
+
+                    <div class="legend-group">
+                        <div class="legend-group-label">Connections</div>
+                        <div class="legend-item">
+                            <svg class="legend-line" width="26" height="8">
+                                <defs><marker id="leg-arrow-f" viewBox="0 -4 8 8" refX="7" markerWidth="5" markerHeight="5" orient="auto"><path d="M0,-3L7,0L0,3" fill="#3b82f6"/></marker></defs>
+                                <line x1="0" y1="4" x2="22" y2="4" stroke="#3b82f6" stroke-width="2.4" marker-end="url(#leg-arrow-f)" />
+                            </svg>Father → Child
+                        </div>
+                        <div class="legend-item">
+                            <svg class="legend-line" width="26" height="8">
+                                <defs><marker id="leg-arrow-m" viewBox="0 -4 8 8" refX="7" markerWidth="5" markerHeight="5" orient="auto"><path d="M0,-3L7,0L0,3" fill="#ec4899"/></marker></defs>
+                                <line x1="0" y1="4" x2="22" y2="4" stroke="#ec4899" stroke-width="2.4" marker-end="url(#leg-arrow-m)" />
+                            </svg>Mother → Child
+                        </div>
+                        <div class="legend-item">
+                            <svg class="legend-line" width="26" height="8">
+                                <line x1="0" y1="4" x2="26" y2="4" stroke="#f59e0b" stroke-width="2.4"
+                                    stroke-dasharray="9 4 2 4" stroke-linecap="round" />
+                            </svg>Marriage ♥
+                        </div>
+                        <div class="legend-item">
+                            <svg class="legend-line" width="26" height="8">
+                                <line x1="0" y1="4" x2="26" y2="4" stroke="#64748b" stroke-width="1.7"
+                                    stroke-dasharray="1 6" stroke-linecap="round" />
+                            </svg>Cousin / extended
+                        </div>
+                    </div>
+
+                    <div class="legend-hint">Hover a node to focus · Drag to arrange · Scroll to zoom · Click to
+                        re-center</div>
                 </div>
             </div>
 

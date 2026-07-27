@@ -4,6 +4,10 @@
 # Ignore logs and temp text files
 *.txt
 
+# Ignore documentation and thesis sources
+*.md
+*.tex
+
 # Python cache and environments
 __pycache__/
 *.py[cod]

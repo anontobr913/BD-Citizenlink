@@ -109,6 +109,80 @@ body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);min-
 .hero-rel-label{font-size:18px;font-weight:700;color:var(--gold);margin-bottom:4px}
 .hero-rel-path{font-size:12px;color:var(--muted);line-height:1.5}
 
+/* Inheritors Section (below relationship finder) */
+.inheritors-section{background:var(--bg);padding:0 24px 48px;position:relative;z-index:2}
+.inheritors-container{max-width:640px;margin:0 auto;padding:24px 32px;background:var(--card);border:1px solid var(--border);border-radius:20px;box-shadow:0 8px 32px rgba(0,0,0,.3)}
+.inheritors-header{display:flex;align-items:center;gap:14px;margin-bottom:20px}
+.inheritors-icon{font-size:28px}
+.inheritors-header h2{font-size:17px;font-weight:700;color:var(--text)}
+.inheritors-header p{font-size:12px;color:var(--muted);margin-top:2px}
+.inheritors-input-row{display:flex;align-items:flex-end;gap:10px}
+.inheritors-input-wrap{flex:1}
+.inheritors-input-wrap label{display:block;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:6px;font-weight:600}
+.inheritors-input-wrap input{width:100%;padding:10px 14px;background:var(--input-bg);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:13px;font-family:'JetBrains Mono',monospace;outline:none;transition:border-color .2s}
+.inheritors-input-wrap input:focus{border-color:var(--accent)}
+.inheritors-input-wrap input::placeholder{color:var(--muted)}
+.inheritors-btn{padding:10px 24px;background:var(--gold);color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:600;font-family:'Outfit',sans-serif;cursor:pointer;transition:opacity .15s,transform .15s;white-space:nowrap}
+.inheritors-btn:hover{opacity:.9;transform:translateY(-1px)}
+.inheritors-result{display:none;margin-top:14px;padding:14px 18px;background:var(--input-bg);border:1px solid var(--border);border-radius:12px;animation:fadeIn .3s ease}
+.inheritors-result.active{display:block}
+.inheritors-result-header{font-size:15px;font-weight:700;color:var(--gold);margin-bottom:12px}
+.inheritors-list{display:flex;flex-direction:column;gap:8px}
+.inheritor-card{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--card);border:1px solid var(--border);border-radius:10px;border-left:3px solid var(--muted);transition:background .15s,border-color .15s}
+.inheritor-card:hover{background:rgba(124,106,239,.06);border-color:var(--accent)}
+.inheritor-card.male{border-left-color:var(--male)}
+.inheritor-card.female{border-left-color:var(--female)}
+.inheritor-info{display:flex;flex-direction:column;gap:2px}
+.inheritor-name{font-size:13px;font-weight:600;color:var(--text)}
+.inheritor-nid{font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--accent2)}
+.inheritor-meta{display:flex;align-items:center;gap:10px;font-size:11px;color:var(--muted)}
+.inheritor-gender{font-size:14px}
+.inheritor-count{font-size:12px;color:var(--muted);font-weight:500;margin-top:4px}
+.inheritors-empty{text-align:center;padding:16px;color:var(--muted);font-size:13px}
+
+/* Birth Registration Audit Section */
+.birth-audit-section{background:var(--bg);padding:0 24px 48px;position:relative;z-index:2}
+.birth-audit-container{max-width:640px;margin:0 auto;padding:24px 32px;background:var(--card);border:1px solid var(--border);border-radius:20px;box-shadow:0 8px 32px rgba(0,0,0,.3)}
+.birth-audit-header{display:flex;align-items:center;gap:14px;margin-bottom:20px}
+.birth-audit-icon{font-size:28px}
+.birth-audit-header h2{font-size:17px;font-weight:700;color:var(--text)}
+.birth-audit-header p{font-size:12px;color:var(--muted);margin-top:2px}
+.birth-audit-inputs{display:flex;align-items:flex-end;gap:10px}
+.birth-audit-input-wrap{flex:1}
+.birth-audit-input-wrap label{display:block;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:6px;font-weight:600}
+.birth-audit-input-wrap input{width:100%;padding:10px 14px;background:var(--input-bg);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:13px;font-family:'JetBrains Mono',monospace;outline:none;transition:border-color .2s}
+.birth-audit-input-wrap input:focus{border-color:var(--accent)}
+.birth-audit-input-wrap input::placeholder{color:var(--muted)}
+.birth-audit-divider{color:var(--muted);display:flex;align-items:center;padding-bottom:4px}
+.birth-audit-btn{padding:10px 24px;background:var(--red);color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:600;font-family:'Outfit',sans-serif;cursor:pointer;transition:opacity .15s,transform .15s;white-space:nowrap}
+.birth-audit-btn:hover{opacity:.9;transform:translateY(-1px)}
+.birth-audit-result{display:none;margin-top:14px;animation:fadeIn .3s ease}
+.birth-audit-result.active{display:block}
+.birth-audit-summary{padding:14px 18px;border-radius:12px;margin-bottom:12px;font-size:14px;font-weight:600}
+.birth-audit-summary.clean{background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.25);color:var(--green)}
+.birth-audit-summary.flagged{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.25);color:var(--red)}
+.birth-audit-summary.info{background:var(--input-bg);border:1px solid var(--border);color:var(--muted)}
+.birth-audit-timeline{display:flex;flex-direction:column;gap:8px}
+.audit-timeline-item{padding:12px 14px;background:var(--input-bg);border:1px solid var(--border);border-radius:10px;border-left:3px solid var(--muted)}
+.audit-timeline-item.status-ok{border-left-color:var(--green)}
+.audit-timeline-item.status-flagged{border-left-color:var(--red);background:rgba(239,68,68,.04)}
+.audit-timeline-item.status-twins{border-left-color:var(--gold);background:rgba(245,158,11,.04)}
+.audit-pair{display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:13px}
+.audit-pair-name{font-weight:600;color:var(--text)}
+.audit-pair-arrow{color:var(--muted);font-size:11px}
+.audit-status-badge{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:6px;font-size:11px;font-weight:700;letter-spacing:.3px}
+.audit-status-badge.ok{background:rgba(16,185,129,.12);color:var(--green)}
+.audit-status-badge.flagged{background:rgba(239,68,68,.14);color:var(--red)}
+.audit-status-badge.twins{background:rgba(245,158,11,.12);color:var(--gold)}
+.audit-message{font-size:12px;color:var(--muted);margin-top:2px}
+.audit-gap{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent2)}
+.audit-children-list{margin-top:10px;padding-top:10px;border-top:1px solid var(--border)}
+.audit-child-row{display:flex;align-items:center;justify-content:space-between;padding:6px 10px;font-size:12px;border-radius:6px;transition:background .12s}
+.audit-child-row:hover{background:rgba(124,106,239,.05)}
+.audit-child-name{font-weight:500;color:var(--text)}
+.audit-child-dob{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent2)}
+.birth-audit-empty{text-align:center;padding:16px;color:var(--muted);font-size:13px}
+
 /* ===== APP SECTION ===== */
 .app-section{height:100vh;display:none;flex-direction:row}
 .app-section.active{display:flex}
@@ -182,10 +256,22 @@ body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);min-
 .toolbar button{width:36px;height:36px;background:var(--card);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s}
 .toolbar button:hover{background:var(--accent);border-color:var(--accent)}
 
-.legend{position:absolute;bottom:16px;right:16px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:14px 18px;z-index:10;font-size:11px}
-.legend-item{display:flex;align-items:center;gap:8px;margin-bottom:4px}
+.legend{position:absolute;bottom:16px;right:16px;background:rgba(13,17,23,.92);backdrop-filter:blur(10px);border:1px solid var(--border);border-radius:var(--radius);padding:12px 14px;z-index:10;font-size:11px;box-shadow:0 12px 40px rgba(0,0,0,.45);max-width:230px}
+.legend-head{display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none;margin-bottom:8px}
+.legend-head span{font-size:11px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--accent3)}
+.legend-caret{color:var(--muted);transition:transform .2s}
+.legend.collapsed .legend-body{display:none}
+.legend.collapsed .legend-caret{transform:rotate(-90deg)}
+.legend-group{margin-bottom:10px}
+.legend-group:last-child{margin-bottom:0}
+.legend-group-label{font-size:9px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-bottom:5px;font-weight:600}
+.legend-item{display:flex;align-items:center;gap:8px;margin-bottom:4px;color:var(--text)}
 .legend-item:last-child{margin-bottom:0}
-.legend-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.legend-dot{width:11px;height:11px;border-radius:50%;flex-shrink:0}
+.legend-ring{width:12px;height:12px;border-radius:50%;border:2px solid;background:transparent;flex-shrink:0;box-sizing:border-box}
+.legend-ring.dash{border-style:dashed}
+.legend-line{flex-shrink:0;width:26px;height:8px;overflow:visible}
+.legend-hint{margin-top:10px;padding-top:8px;border-top:1px solid var(--border);font-size:10px;color:var(--muted);line-height:1.5}
 
 .empty-state{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;color:var(--muted)}
 .empty-state h2{font-size:20px;margin-bottom:8px;font-weight:600}
@@ -193,17 +279,31 @@ body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);min-
 
 .main svg{width:100%;height:100%}
 
-.link{fill:none;stroke-width:2}
-.link-father{stroke:var(--male)}
-.link-mother{stroke:var(--female)}
-.link-spouse{stroke:var(--gold);stroke-dasharray:5,5}
-.link-parent{stroke:var(--muted);stroke-dasharray:3,3}
+/* ---- Edges: each relationship type has its own colour + line style + arrow ---- */
+.link{fill:none;transition:opacity .2s ease,stroke-width .2s ease}
+.link-father{stroke:var(--male);stroke-width:2.2}                                   /* solid blue  */
+.link-mother{stroke:var(--female);stroke-width:2.2}                                 /* solid pink  */
+.link-spouse{stroke:var(--gold);stroke-width:2.4;stroke-dasharray:9 4 2 4;stroke-linecap:round} /* gold dash-dot */
+.link-cousin{stroke:#64748b;stroke-width:1.7;stroke-dasharray:1 6;stroke-linecap:round}         /* grey dotted   */
+.link-parent{stroke:var(--muted);stroke-width:1.7;stroke-dasharray:5 5}             /* grey dashed */
 
-.node{cursor:pointer}
-.node circle{stroke-width:2.5;transition:r .15s}
-.node:hover circle{r:22}
-.node text{fill:var(--text);font-size:10px;font-weight:500;pointer-events:none}
-.node .role-label{fill:var(--gold);font-size:9px;font-weight:600;letter-spacing:.3px}
+/* focus mode: hovering a node dims everything not connected to it */
+.link.faded{opacity:.05}
+.link.hot{stroke-width:3.4;opacity:1;filter:drop-shadow(0 0 5px rgba(255,255,255,.25))}
+
+.marriage-badge{fill:var(--gold);font-size:12px;pointer-events:none;paint-order:stroke;stroke:var(--bg);stroke-width:2.5px;stroke-linejoin:round;transition:opacity .2s}
+.marriage-badge.faded{opacity:.06}
+
+/* ---- Nodes ---- */
+.node{cursor:pointer;transition:opacity .2s ease}
+.node.faded{opacity:.12}
+.node .node-core{transition:r .15s ease}
+.node .node-ring{transition:opacity .2s}
+.node-name{fill:#eef2fb;font-size:10.5px;font-weight:600;pointer-events:none;paint-order:stroke;stroke:var(--bg);stroke-width:3.5px;stroke-linejoin:round}
+.role-label{fill:var(--accent3);font-size:9px;font-weight:700;letter-spacing:.2px;pointer-events:none;paint-order:stroke;stroke:var(--bg);stroke-width:3px;stroke-linejoin:round}
+.gender-glyph{fill:rgba(255,255,255,.92);font-size:13px;font-weight:700;pointer-events:none}
+.poly-badge-bg{fill:var(--gold);stroke:var(--bg);stroke-width:1.5}
+.poly-badge-txt{fill:#241705;font-size:8.5px;font-weight:800;pointer-events:none}
 
 .glow-ring{animation:pulse 2s ease-in-out infinite}
 @keyframes pulse{0%,100%{opacity:.4;r:28}50%{opacity:.8;r:34}}
@@ -252,6 +352,12 @@ body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);min-
 .rel-badge.direct{background:rgba(16,185,129,.12);color:var(--green)}
 .rel-badge.extended{background:rgba(245,158,11,.12);color:var(--gold)}
 .rel-badge.in-law{background:rgba(139,92,246,.12);color:var(--accent2)}
+/* multiple-marriage categories — same hues as the graph rings */
+.rel-badge.co-spouse{background:rgba(244,63,94,.14);color:#fb7185}
+.rel-badge.half{background:rgba(34,211,238,.12);color:#22d3ee}
+.rel-badge.step{background:rgba(251,146,60,.12);color:#fb923c}
+/* the "why" note under a relationship: same father, shares husband X */
+.rel-via{display:block;font-size:10.5px;color:var(--muted);margin-top:2px}
 .gender-tag{font-size:12px}
 .gender-m{color:var(--male)}
 .gender-f{color:var(--female)}

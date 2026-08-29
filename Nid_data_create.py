@@ -48,6 +48,14 @@ def fast_gen():
     religions = ['Muslim', 'Hindu', 'Buddhist', 'Christian']
     rel_weights = [90, 8, 1, 1]
 
+    # --- Multiple Marriage (Polygyny) configuration ---
+    # Probability that a MARRIED Muslim man takes 2, 3 or 4 wives. Anything not
+    # covered here stays monogamous (single wife). Tune these to taste.
+    POLYGYNY = {'2': 0.08, '3': 0.03, '4': 0.01}   # ~12% of married Muslim men
+    # Separator used inside the single `spouse_nid` CSV column when a person has
+    # more than one spouse. NIDs are pure digits so '|' never collides.
+    SPOUSE_SEP = '|'
+
     # Founder Generation (Gen-1)
     founder_count = 782500
     print(f"Generating Gen-1 Founders ({founder_count})...")
@@ -104,64 +112,91 @@ def fast_gen():
         for father in males:
             # Rule 7, 8, 9: Marriage rates
             if random.random() > gen['m_rate']: continue
-            
+
             rel = father[6]
             # Rule 5, 20: Couples must share same religion
             if not females_by_rel[rel]:
                 continue
-            
-            mother = females_by_rel[rel].popleft()
-            
-            # Rule 6: Marriage linkage is mutual
-            father[11] = mother[0] # spouse_nid
-            mother[11] = father[0]
-            
-            # Rule 1 & 2: Father >= 21, Mother >= 18
+
+            # Rule 1: Father >= 21
             f_year = int(father[5][:4])
-            m_year = int(mother[5][:4])
-            min_biological_year = max(f_year + 21, m_year + 18)
-            
-            start_birth_year = max(min_biological_year, gen['b_range'][0])
-            
-            # Rule 10, 11, 12: Number of children
-            num_children = random.randint(gen['k_range'][0], gen['k_range'][1])
-            
-            for i in range(num_children):
-                # Rule 3: Sibling gap 1-4 years
-                birth_year = start_birth_year + (i * random.randint(1, 4))
-                
-                # Rule 15, 16, 17: Enforce generation boundary
-                if birth_year > gen['b_range'][1]: break
-                
-                # Rule 28: Child gender ratio (50/50)
-                child_gender = 'M' if random.random() < 0.50 else 'F'
-                
-                # Rule 23: Child inherits father's surname
-                surname = father[2].split()[-1]
-                
-                # Rule 26: Religion-based naming patterns preserved
-                name_pool = name_data[rel]['gen_3_plus' if gen['label'] >= 3 else 'gen_1_2']
-                first = random.choice(name_pool['male_first' if child_gender=='M' else 'female_first'])
-                full_name = f"{first} {surname}"
-                
-                # NID Generation
-                dist_name = father[12].split(',')[-2].strip()
-                c_nid = generate_nid(birth_year, dist_name)
-                c_brn = generate_brn(birth_year)
-                
-                # Rule 24, 25: Child inherits father's perm and pres address
-                perm_address = father[12]
-                pres_address = father[13]
-                
-                # Rule 4, 34: Parent relationships
-                c_row = [c_nid, c_brn, full_name, child_gender, 
-                         random.choice(['A+','O+','B+','AB+','A-','O-','B-','AB-']), f"{birth_year}-06-15", rel,
-                         father[2], mother[2], father[0], mother[0], "", 
-                         perm_address, pres_address, perm_address != pres_address]
-                         
-                all_records.append(c_row)
-                next_gen_parents.append(c_row)
-                
+
+            # --- Multiple Marriages (Polygyny) ---
+            # Islam permits a Muslim man up to 4 wives. Only Muslim males are
+            # eligible for more than one wife; everyone else stays monogamous.
+            # Rule 35: Half-siblings share one parent only -> children of two
+            # different wives of the same father become half-siblings.
+            num_wives = 1
+            if rel == 'Muslim' and father[3] == 'M':
+                r = random.random()
+                if   r < POLYGYNY['4']:                      num_wives = 4   # ~1%
+                elif r < POLYGYNY['4'] + POLYGYNY['3']:      num_wives = 3   # ~3%
+                elif r < POLYGYNY['4'] + POLYGYNY['3'] + POLYGYNY['2']:
+                    num_wives = 2   # ~8%
+                # else stays 1 (~88%)
+
+            wife_nids = []
+
+            for _w in range(num_wives):
+                # Stop early if we've run out of eligible women of this religion
+                if not females_by_rel[rel]:
+                    break
+
+                mother = females_by_rel[rel].popleft()
+
+                # Rule 6: Marriage linkage is mutual. A wife has exactly one
+                # husband; the husband accumulates every wife's NID.
+                mother[11] = father[0]           # wife's spouse -> this husband
+                wife_nids.append(mother[0])
+
+                # Rule 1 & 2: Father >= 21, Mother >= 18
+                m_year = int(mother[5][:4])
+                min_biological_year = max(f_year + 21, m_year + 18)
+                start_birth_year = max(min_biological_year, gen['b_range'][0])
+
+                # Rule 10, 11, 12: Number of children (per wife)
+                num_children = random.randint(gen['k_range'][0], gen['k_range'][1])
+
+                for i in range(num_children):
+                    # Rule 3: Sibling gap 1-4 years
+                    birth_year = start_birth_year + (i * random.randint(1, 4))
+
+                    # Rule 15, 16, 17: Enforce generation boundary
+                    if birth_year > gen['b_range'][1]: break
+
+                    # Rule 28: Child gender ratio (50/50)
+                    child_gender = 'M' if random.random() < 0.50 else 'F'
+
+                    # Rule 23: Child inherits father's surname
+                    surname = father[2].split()[-1]
+
+                    # Rule 26: Religion-based naming patterns preserved
+                    name_pool = name_data[rel]['gen_3_plus' if gen['label'] >= 3 else 'gen_1_2']
+                    first = random.choice(name_pool['male_first' if child_gender=='M' else 'female_first'])
+                    full_name = f"{first} {surname}"
+
+                    # NID Generation
+                    dist_name = father[12].split(',')[-2].strip()
+                    c_nid = generate_nid(birth_year, dist_name)
+                    c_brn = generate_brn(birth_year)
+
+                    # Rule 24, 25: Child inherits father's perm and pres address
+                    perm_address = father[12]
+                    pres_address = father[13]
+
+                    # Rule 4, 34: Parent relationships (father shared, mother varies per wife)
+                    c_row = [c_nid, c_brn, full_name, child_gender,
+                             random.choice(['A+','O+','B+','AB+','A-','O-','B-','AB-']), f"{birth_year}-06-15", rel,
+                             father[2], mother[2], father[0], mother[0], "",
+                             perm_address, pres_address, perm_address != pres_address]
+
+                    all_records.append(c_row)
+                    next_gen_parents.append(c_row)
+
+            # Rule 6 & 31: store all spouse links. One wife -> plain NID (same as
+            # before); multiple wives -> pipe-separated list e.g. "W1|W2|W3".
+            father[11] = SPOUSE_SEP.join(wife_nids)
+
         gen_parents = next_gen_parents
 
     print(f"Total generated: {len(all_records)} records. Writing to CSV...")

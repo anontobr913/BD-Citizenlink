@@ -8,14 +8,18 @@ USERNAME = "neo4j"
 PASSWORD = "913913913"  # update this if your local neo4j password is different
 DATABASE = "neo4j"      # update this if your database has a different name
 
-def import_data():
+def import_data(csv_file="Nid_data_create.csv"):
     """
     Main function to read citizen data from CSV and import it into Neo4j.
-    It does this in two passes: first creating all citizen nodes, 
+    It does this in two passes: first creating all citizen nodes,
     and then creating the relationships (parents, spouse) between them.
+
+    `csv_file` defaults to the full dataset, but you can pass a smaller file
+    (e.g. "polygamy_delta.csv") to load just newly-added rows in seconds.
+    Because every write uses MERGE, importing a delta on top of an existing
+    graph is safe and idempotent.
     """
     driver = GraphDatabase.driver(URI, auth=(USERNAME, PASSWORD))
-    csv_file = "Nid_data_create.csv"
     batch_size = 10000
     
     with driver.session(database=DATABASE) as session:
@@ -117,17 +121,27 @@ def create_relationships_tx(tx, batch):
     """
     tx.run(mother_query, batch=batch)
 
+    # A person may have multiple spouses (polygyny). The CSV stores them in a
+    # single `spouse_nid` column, pipe-separated (e.g. "W1|W2|W3"). We split the
+    # value and create one MARRIED_TO edge per spouse. The `nid < sp_nid` guard
+    # still de-duplicates each pair so we only build every marriage edge once.
     spouse_query = """
     UNWIND $batch AS row
-    WITH row WHERE row.spouse_nid IS NOT NULL AND row.nid < row.spouse_nid
-    MATCH (c1:Citizen {nid: row.nid})
-    MATCH (c2:Citizen {nid: row.spouse_nid})
+    WITH row WHERE row.spouse_nid IS NOT NULL
+    UNWIND split(row.spouse_nid, '|') AS sp_nid
+    WITH row.nid AS nid, sp_nid
+    WHERE sp_nid <> '' AND nid < sp_nid
+    MATCH (c1:Citizen {nid: nid})
+    MATCH (c2:Citizen {nid: sp_nid})
     MERGE (c1)-[:MARRIED_TO]-(c2)
     """
     tx.run(spouse_query, batch=batch)
 
 if __name__ == "__main__":
-    print("Starting Neo4j Import...")
+    import sys
+    # Optional CSV filename argument, e.g.:  python neo4j_import.py polygamy_delta.csv
+    target = sys.argv[1] if len(sys.argv) > 1 else "Nid_data_create.csv"
+    print(f"Starting Neo4j Import from {target}...")
     t0 = time.time()
-    import_data()
+    import_data(target)
     print(f"Total time taken: {time.time() - t0:.2f} seconds")

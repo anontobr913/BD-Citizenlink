@@ -11,6 +11,7 @@ Features:
 from flask import Flask, jsonify, render_template, request
 from neo4j import GraphDatabase
 from collections import defaultdict, deque
+from datetime import datetime
 
 app = Flask(__name__)
 
@@ -190,8 +191,61 @@ def get_family_tree(nid):
                 "type": "HAS_PARENT"
             })
 
-        # finally, get spouses for all family members we just found
-        existing_nids = list(nodes.keys())
+        # find uncles & aunts (a parent's siblings, on both sides). They share a
+        # GRANDPARENT with one of the root's parents, so we hang them off that
+        # grandparent (already on the canvas from the ancestor query). This lets
+        # the classifier label them Uncle / Aunt and the View Table sort them
+        # onto the correct side. They are hidden from the graph itself (app.js).
+        uncle_result = session.run("""
+            MATCH (c:Citizen {nid: $nid})-[:HAS_FATHER|HAS_MOTHER]->(parent)
+                  -[:HAS_FATHER|HAS_MOTHER]->(gp)<-[ur:HAS_FATHER|HAS_MOTHER]-(uncle)
+            WHERE uncle.nid <> parent.nid AND uncle.nid <> $nid
+            RETURN DISTINCT uncle, gp.nid AS gp_nid, type(ur) AS uncle_rel
+        """, nid=nid)
+        uncle_ids = set()
+        for rec in uncle_result:
+            unc = rec["uncle"]
+            u_nid = unc["nid"]
+            if u_nid not in nodes:
+                n = _node_to_dict(unc)
+                n["_role"] = "uncle"
+                nodes[u_nid] = n
+            uncle_ids.add(u_nid)
+            if rec["gp_nid"] in nodes:
+                edges.append({"source": u_nid, "target": rec["gp_nid"], "type": rec["uncle_rel"]})
+
+        # cousins = the uncles'/aunts' children. Shown in the View Table only
+        # (hidden from the graph like the uncles/aunts themselves).
+        if uncle_ids:
+            cousin2_result = session.run("""
+                UNWIND $uncles AS u_nid
+                MATCH (cousin)-[cr:HAS_FATHER|HAS_MOTHER]->(uncle:Citizen {nid: u_nid})
+                WHERE cousin.nid <> $nid
+                RETURN DISTINCT cousin, u_nid AS uncle_nid, type(cr) AS cousin_rel
+            """, uncles=list(uncle_ids), nid=nid)
+            for rec in cousin2_result:
+                cous = rec["cousin"]
+                c2_nid = cous["nid"]
+                if c2_nid not in nodes:
+                    n = _node_to_dict(cous)
+                    n["_role"] = "cousin"
+                    nodes[c2_nid] = n
+                edges.append({"source": c2_nid, "target": rec["uncle_nid"], "type": rec["cousin_rel"]})
+
+        # finally, pull in the marriages that the multiple-marriage view needs:
+        #   * the root's own spouses -> a wife sees her co-wives through the
+        #     husband they share
+        #   * the root's DIRECT parents' spouses -> a child sees the father's
+        #     other wives (their step-mothers)
+        # Everyone else's marriages are deliberately skipped. Expanding children,
+        # siblings, cousins -- or deeper ancestors like grandparents -- only drags
+        # in-laws onto the canvas (sons-in-law, sisters-in-law, and grandparents'
+        # other spouses that show up as "grandmother-in-law"). This tree is about
+        # the household, not who married into it.
+        root_parents = {e["target"] for e in edges
+                        if e["source"] == nid and e["type"] in ("HAS_FATHER", "HAS_MOTHER")}
+        existing_nids = [n for n, d in nodes.items()
+                         if d.get("_role") == "spouse" or n in root_parents]
         spouse_ext = session.run("""
             UNWIND $nids AS fam_nid
             MATCH (c:Citizen {nid: fam_nid})-[:MARRIED_TO]-(sp)
@@ -210,6 +264,31 @@ def get_family_tree(nid):
                 "type": "MARRIED_TO"
             })
 
+        # Fill in every parent link between two people who are already on the
+        # canvas. The queries above each follow a single line at a time, so a
+        # half-sibling would otherwise hang off the shared father only, and all
+        # of a polygynous man's children would collapse into one undifferentiated
+        # pile instead of one branch per wife.
+        parents = _fetch_parents(session, list(nodes.keys()))
+        for child_nid, pair in parents.items():
+            for parent_key, rel_type in (("father", "HAS_FATHER"),
+                                         ("mother", "HAS_MOTHER")):
+                parent_nid = pair[parent_key]
+                if parent_nid and parent_nid in nodes:
+                    edges.append({
+                        "source": child_nid,
+                        "target": parent_nid,
+                        "type": rel_type
+                    })
+
+        # The cousin query adds generic HAS_PARENT links; drop the ones the step
+        # above just superseded with a real father/mother link.
+        typed_pairs = {(e["source"], e["target"]) for e in edges
+                       if e["type"] in ("HAS_FATHER", "HAS_MOTHER")}
+        edges = [e for e in edges
+                 if e["type"] != "HAS_PARENT"
+                 or (e["source"], e["target"]) not in typed_pairs]
+
         # De-duplicate edges
         unique_edges = []
         seen_edges = set()
@@ -221,7 +300,7 @@ def get_family_tree(nid):
                 unique_edges.append(e)
 
         # Compute specific relationship labels for every node
-        _compute_all_relationships(nid, nodes, unique_edges)
+        _compute_all_relationships(nid, nodes, unique_edges, parents)
 
     return jsonify({
         "root_nid": nid,
@@ -270,19 +349,31 @@ def find_relationship(nid1, nid2):
         path_nodes = record["path_nodes"]
         path_rels = record["path_rels"]
 
+        # Both people's parents, so the classifier can tell a full sibling
+        # from a half sibling.
+        parents = _fetch_parents(session, [nid1, nid2])
+
         # Classify the relationship
-        label = _classify_relationship(nid1, nid2, path_nodes, path_rels)
+        label = _classify_relationship(nid1, nid2, path_nodes, path_rels, parents)
+
+        # For a co-wife the person in the middle of the path is the shared
+        # husband, which is the one detail that makes the label make sense.
+        middle_name = path_nodes[1].get("full_name") if len(path_nodes) == 3 else None
+        detail = _relationship_detail(
+            label, parents.get(nid1), parents.get(nid2), middle_name
+        )
 
         return jsonify({
             "found": True,
             "relationship": label,
+            "detail": detail,
             "path_nodes": path_nodes,
             "path_rels": path_rels,
             "path_length": len(path_rels)
         })
 
 
-def _classify_relationship(nid1, nid2, path_nodes, path_rels):
+def _classify_relationship(nid1, nid2, path_nodes, path_rels, parents=None):
     """
     Walk through the shortest path and produce a human-readable
     relationship label from nid1's perspective.
@@ -331,6 +422,13 @@ def _classify_relationship(nid1, nid2, path_nodes, path_rels):
     ups = sum(1 for m in moves if m[0] == "UP")
     downs = sum(1 for m in moves if m[0] == "DOWN")
     spouses = sum(1 for m in moves if m[0] == "SPOUSE")
+
+    # Multiple marriages get named first (see _marriage_label).
+    parents = parents or {}
+    married = _marriage_label(moves, nid2_gender == "M",
+                              parents.get(nid1), parents.get(nid2))
+    if married:
+        return married
 
     # Direct parent
     if len(moves) == 1 and moves[0][0] == "UP":
@@ -417,12 +515,16 @@ def _classify_relationship(nid1, nid2, path_nodes, path_rels):
     return f"Related ({ups} gen up, {downs} gen down, {spouses} marriage link{'s' if spouses > 1 else ''})"
 
 
-def _compute_all_relationships(root_nid, nodes, edges):
+def _compute_all_relationships(root_nid, nodes, edges, parents=None):
     """
     Walk through the family tree graph starting from root_nid.
     For each person, determine their specific relationship to the root
     (e.g., Father, Grandmother, Uncle, Cousin) instead of generic labels.
+
+    `parents` is {nid: {'father': nid, 'mother': nid}} and is what lets us tell
+    a half sibling from a full one.
     """
+    parents = parents or {}
 
     # Step 1: Build an adjacency list from the edges
 
@@ -450,7 +552,10 @@ def _compute_all_relationships(root_nid, nodes, edges):
 
     # Step 2: BFS from the root to find the shortest path to every node
     # visited stores: nid -> list of (direction, rel_type) moves
+    # came_from remembers who we arrived through, so a co-wife label can name
+    # the husband the two women share.
     visited = {root_nid: []}
+    came_from = {}
     queue = deque([root_nid])
 
     while queue:
@@ -460,6 +565,7 @@ def _compute_all_relationships(root_nid, nodes, edges):
         for neighbor_nid, direction, rel_type in adjacency[current]:
             if neighbor_nid not in visited:
                 visited[neighbor_nid] = current_path + [(direction, rel_type)]
+                came_from[neighbor_nid] = current
                 queue.append(neighbor_nid)
 
     # Step 3: Classify the relationship for each node
@@ -474,10 +580,18 @@ def _compute_all_relationships(root_nid, nodes, edges):
 
         path = visited[nid]
         gender = node.get("gender", "")
-        node["_role"] = _label_from_path(path, gender)
+        root_parents, own_parents = parents.get(root_nid), parents.get(nid)
+        label = _label_from_path(path, gender, root_parents, own_parents)
+        node["_role"] = label
+
+        via_nid = came_from.get(nid)
+        middle_name = nodes.get(via_nid, {}).get("full_name") if via_nid else None
+        detail = _relationship_detail(label, root_parents, own_parents, middle_name)
+        if detail:
+            node["_via"] = detail
 
 
-def _label_from_path(moves, target_gender):
+def _label_from_path(moves, target_gender, root_parents=None, target_parents=None):
     """
     Given a path of moves from root to target, return a specific
     relationship name like 'Father', 'Grandmother', 'Uncle', etc.
@@ -493,6 +607,11 @@ def _label_from_path(moves, target_gender):
     downs = sum(1 for d, _ in moves if d == "DOWN")
     spouses = sum(1 for d, _ in moves if d == "SPOUSE")
     total = len(moves)
+
+    # Multiple marriages get named first (see _marriage_label).
+    married = _marriage_label(moves, is_male, root_parents, target_parents)
+    if married:
+        return married
 
     # direct relationships (only 1 step away)
 
@@ -587,6 +706,100 @@ def _label_from_path(moves, target_gender):
     return "Related (" + ", ".join(parts) + ")"
 
 
+# ---------------------------------------------------------------------------
+# Multiple marriages
+# ---------------------------------------------------------------------------
+# Islam permits a man up to four wives, so the data contains households where
+# one husband has several wives and each wife has her own children. That
+# creates four relationships an ordinary family tree never has to name, and the
+# move-counting above cannot name them on its own: it sees "one parent hop plus
+# one marriage hop" and has no way to tell a father's second wife from a wife's
+# mother, because it never looks at the order the hops came in.
+
+
+def _fetch_parents(session, nids):
+    """Return {nid: {'father': nid|None, 'mother': nid|None}} for these people."""
+    result = session.run("""
+        UNWIND $nids AS wanted
+        MATCH (c:Citizen {nid: wanted})
+        OPTIONAL MATCH (c)-[:HAS_FATHER]->(f)
+        OPTIONAL MATCH (c)-[:HAS_MOTHER]->(m)
+        RETURN c.nid AS nid, f.nid AS father, m.nid AS mother
+    """, nids=nids)
+    return {
+        rec["nid"]: {"father": rec["father"], "mother": rec["mother"]}
+        for rec in result
+    }
+
+
+def _shared_parents(a, b):
+    """Which parents two people have in common: 'father', 'mother', or both."""
+    a, b = a or {}, b or {}
+    shared = []
+    if a.get("father") and a["father"] == b.get("father"):
+        shared.append("father")
+    if a.get("mother") and a["mother"] == b.get("mother"):
+        shared.append("mother")
+    return shared
+
+
+def _shares_one_parent(a, b):
+    """
+    True only when both people have both parents on record and exactly one of
+    them matches. A missing parent is not a different parent, so when anything
+    is unknown we say nothing and let them stay plain siblings.
+    """
+    if not a or not b:
+        return False
+    if not all(a.get(key) and b.get(key) for key in ("father", "mother")):
+        return False
+    return len(_shared_parents(a, b)) == 1
+
+
+def _marriage_label(moves, is_male, root_parents=None, target_parents=None):
+    """
+    Name the four relationships that only appear once someone has married more
+    than once. Returns None for everything else, leaving ordinary relatives to
+    the tables above.
+    """
+    steps = [move[0] for move in moves]
+
+    # Married to the same person I am married to.
+    if steps == ["SPOUSE", "SPOUSE"]:
+        return "Co-Husband" if is_male else "Co-Wife"
+
+    # Up to a parent, then across to their other spouse. My own mother is a
+    # single hop away, so she is never the one found here.
+    if steps == ["UP", "SPOUSE"]:
+        return "Step-Father" if is_male else "Step-Mother"
+
+    # Across to my spouse, then down to a child who is not mine.
+    if steps == ["SPOUSE", "DOWN"]:
+        return "Step-Son" if is_male else "Step-Daughter"
+
+    # A sibling path, but only one parent in common.
+    if steps == ["UP", "DOWN"] and _shares_one_parent(root_parents, target_parents):
+        return "Half-Brother" if is_male else "Half-Sister"
+
+    return None
+
+
+def _relationship_detail(label, root_parents, target_parents, middle_name=None):
+    """
+    The one-line note that makes a multiple-marriage label make sense:
+    which parent a half sibling shares, and whose husband two co-wives share.
+    """
+    if label in ("Half-Brother", "Half-Sister"):
+        shared = _shared_parents(root_parents, target_parents)
+        return "same " + shared[0] if shared else None
+
+    if label in ("Co-Wife", "Co-Husband"):
+        word = "husband" if label == "Co-Wife" else "wife"
+        return "shares " + word + " " + middle_name if middle_name else "shares a " + word
+
+    return None
+
+
 # search citizens by NID or partial name match
 @app.route("/api/search")
 def search_citizens():
@@ -618,6 +831,160 @@ def search_citizens():
     return jsonify(citizens)
 
 
+# get inheritors (children) of a citizen by NID
+@app.route("/api/inheritors/<nid>")
+def get_inheritors(nid):
+    """Return all children of a citizen — i.e. anyone whose father or mother is this NID."""
+    with driver.session(database=NEO4J_DB) as session:
+        # verify the citizen exists
+        root_rec = session.run(
+            "MATCH (c:Citizen {nid: $nid}) RETURN c.full_name AS name", nid=nid
+        ).single()
+        if not root_rec:
+            return jsonify({"error": "Citizen not found"}), 404
+
+        parent_name = root_rec["name"]
+
+        # find all children (anyone pointing HAS_FATHER or HAS_MOTHER to this NID)
+        result = session.run("""
+            MATCH (child)-[:HAS_FATHER|HAS_MOTHER]->(parent:Citizen {nid: $nid})
+            RETURN properties(child) AS child
+            ORDER BY child.dob
+        """, nid=nid)
+        children = [rec["child"] for rec in result]
+
+    return jsonify({
+        "parent_nid": nid,
+        "parent_name": parent_name,
+        "children": children
+    })
+
+
+# minimum days between consecutive births to be considered normal
+MIN_BIRTH_GAP_DAYS = 270   # ~9 months
+
+
+@app.route("/api/birth-audit/<father_nid>/<mother_nid>")
+def birth_audit(father_nid, mother_nid):
+    """
+    Audit birth registrations for a couple.
+    Returns all shared children sorted by DOB with flags:
+      - same-day births → twins/triplets (allowed)
+      - gap < MIN_BIRTH_GAP_DAYS → 🚩 flagged
+      - gap >= MIN_BIRTH_GAP_DAYS → ✅ normal
+    """
+    with driver.session(database=NEO4J_DB) as session:
+        # verify both parents exist
+        for label, check_nid in [("Father", father_nid), ("Mother", mother_nid)]:
+            rec = session.run(
+                "MATCH (c:Citizen {nid: $nid}) RETURN c.full_name AS name, c.gender AS gender",
+                nid=check_nid
+            ).single()
+            if not rec:
+                return jsonify({"error": f"{label} NID {check_nid} not found"}), 404
+
+        # fetch parent names
+        father_rec = session.run(
+            "MATCH (c:Citizen {nid: $nid}) RETURN c.full_name AS name", nid=father_nid
+        ).single()
+        mother_rec = session.run(
+            "MATCH (c:Citizen {nid: $nid}) RETURN c.full_name AS name", nid=mother_nid
+        ).single()
+
+        # find all children shared by BOTH this father and this mother
+        result = session.run("""
+            MATCH (child)-[:HAS_FATHER]->(f:Citizen {nid: $father_nid}),
+                  (child)-[:HAS_MOTHER]->(m:Citizen {nid: $mother_nid})
+            RETURN properties(child) AS child
+            ORDER BY child.dob
+        """, father_nid=father_nid, mother_nid=mother_nid)
+        children = [rec["child"] for rec in result]
+
+    if not children:
+        return jsonify({
+            "father_nid": father_nid,
+            "father_name": father_rec["name"],
+            "mother_nid": mother_nid,
+            "mother_name": mother_rec["name"],
+            "children": [],
+            "flags": [],
+            "total_flags": 0,
+            "twins_found": 0
+        })
+
+    # parse DOBs and check consecutive gaps
+    def _parse_dob(dob_str):
+        """Try several date formats the data might use."""
+        for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%Y"):
+            try:
+                return datetime.strptime(dob_str, fmt)
+            except (ValueError, TypeError):
+                continue
+        return None
+
+    flags = []
+    twins_count = 0
+
+    for i in range(1, len(children)):
+        prev = children[i - 1]
+        curr = children[i]
+        prev_dob = _parse_dob(prev.get("dob", ""))
+        curr_dob = _parse_dob(curr.get("dob", ""))
+
+        if not prev_dob or not curr_dob:
+            continue
+
+        gap_days = (curr_dob - prev_dob).days
+
+        if gap_days == 0:
+            # same day → twins/triplets, allowed
+            twins_count += 1
+            flags.append({
+                "child_a_nid": prev["nid"],
+                "child_a_name": prev["full_name"],
+                "child_b_nid": curr["nid"],
+                "child_b_name": curr["full_name"],
+                "gap_days": gap_days,
+                "status": "twins",
+                "message": "Same-day birth — twins/triplets (allowed)"
+            })
+        elif gap_days < MIN_BIRTH_GAP_DAYS:
+            # suspiciously close
+            flags.append({
+                "child_a_nid": prev["nid"],
+                "child_a_name": prev["full_name"],
+                "child_b_nid": curr["nid"],
+                "child_b_name": curr["full_name"],
+                "gap_days": gap_days,
+                "status": "flagged",
+                "message": f"Only {gap_days} days apart (minimum {MIN_BIRTH_GAP_DAYS})"
+            })
+        else:
+            flags.append({
+                "child_a_nid": prev["nid"],
+                "child_a_name": prev["full_name"],
+                "child_b_nid": curr["nid"],
+                "child_b_name": curr["full_name"],
+                "gap_days": gap_days,
+                "status": "ok",
+                "message": f"{gap_days} days apart — normal"
+            })
+
+    total_flags = sum(1 for f in flags if f["status"] == "flagged")
+
+    return jsonify({
+        "father_nid": father_nid,
+        "father_name": father_rec["name"],
+        "mother_nid": mother_nid,
+        "mother_name": mother_rec["name"],
+        "children": children,
+        "flags": flags,
+        "total_flags": total_flags,
+        "twins_found": twins_count,
+        "min_gap_days": MIN_BIRTH_GAP_DAYS
+    })
+
+
 # serve the main frontend page
 @app.route("/")
 def index():
@@ -625,6 +992,11 @@ def index():
 
 
 if __name__ == "__main__":
+    # Open via 127.0.0.1, NOT localhost. On Windows `localhost` resolves to IPv6
+    # ::1 first; this dev server is IPv4-only, so the browser waits ~2s for the
+    # ::1 connection to fail before falling back to 127.0.0.1 -- a flat ~2s added
+    # to EVERY request (including the family-tree fetch, which is why the tree
+    # felt slow to build). Hitting 127.0.0.1 directly skips that failover.
     print("Starting Family Tree Visualization Server...")
-    print("Open http://localhost:5000 in your browser")
+    print("Open http://127.0.0.1:5000 in your browser  (use 127.0.0.1, not localhost)")
     app.run(debug=True, port=5000)
